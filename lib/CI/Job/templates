@@ -1,0 +1,279 @@
+has tt => (is=>'rw', lazy_build=>1, handles=>['process']);
+
+sub _build_tt {
+    return Template->new;
+}
+
+
+__DATA__
+[% USE Dumper %]
+[% USE YAMLVal %]
+
+job:
+  name: [%# data.doc_job %]
+[% builders.print(data.builders) %]
+
+parameters:
+
+scm:
+
+triggers:
+
+wrappers:
+
+prebuilders:
+
+
+[% VIEW builders %]
+builders:
+   [% BLOCK maven %]
+- maven-target:
+    maven-version: [% builder.maven_version %]
+    pom: [% builder.pom %]
+    goals: [% builder.goals %]
+    private-repository: [% builder.private_repository %]
+    properties:
+    [% FOREACH p IN builder.properties %]
+    - [% p.key %]=[% p.value %]
+    [% END %]
+
+    java-opts:
+    [% FOREACH option IN builder.java_options %]
+    - "[% option %]"
+    [% END %]
+    settings: [% builder.settings %[
+    global-settings: [% builder.global_settings %]
+   [% END %]
+[% END %]
+
+
+
+[%- FOREACH b IN data.builders %]
+    [% Dumper.dump(b) %]
+    [%# PROCESS convert_builder builder=b %]
+[% END %]
+
+postbuilders:
+
+publishers:
+[%- FOREACH p IN data.publishers %]
+    [% Dumper.dump(p) %]
+    [%# PROCESS email_publisher publisher=p %]
+[%- END %]
+
+[% BLOCK maven_target_builder %]
+    - maven-target:
+    maven-version: [% builder.maven_version %]
+  pom: [% builder.pom %]
+  goals: [% builder.goals %]
+    private-repository: [% builder.private_repository %]
+  properties:
+    [% FOREACH p IN builder.properties %]
+    - [% p.key %]=[% p.value %]
+    [% END %]
+
+    java-opts:
+    [% FOREACH option IN builder.java_options %]
+    - "[% option %]"
+    [% END %]
+  settings: [% builder.settings %[
+                   global-settings: [% builder.global_settings %]
+[% END %]
+
+
+
+
+[% BLOCK convert_builder %]
+    - [% builder.yamlval %]:
+[% END %]
+
+[% BLOCK email_publisher %]
+    - email:
+  recipients: [% publisher.recipients%]
+    notify-every-unstable-build: [% publisher.dontNotifyEveryUnstableBuild %]
+    send-to-individuals: [% publisher.sendToIndividuals %]
+[% END %]
+
+[% BLOCK general_job_config %]
+    - job:
+  name: [% data.job.name %]
+    project-type: [% data.project_type %]
+  defaults: global
+  disabled: false
+    display-name: [% data.job.display_name %]
+  concurrent: true
+  workspace: [% data.job.workspace %]
+    quiet-period: [% data.job.quiet_period %]
+    block-downstream: false
+    block-upstream: false
+    retry-count: 3
+[% END %]]
+
+[% BLOCK maven_job %]
+    project-type: maven
+  maven:
+    root-module:
+    group-id: [% maven.group_id %]
+    artifact-id: [% maven.artifact_id %]
+    root-pom: [% maven.root_pom %]
+  goals: [% maven.goals %]
+    maven-opts: [% maven.opts %]
+    maven-name: [% maven.name %]
+    automatic-archiving: [% maven.automatic-archiving %]
+[% END %]
+
+[% BLOCK ant_builder %]
+    - ant:
+  targets: [% builder.targets %]
+  buildfile: [% builder.build_file %]
+  properties:
+    [% FOREACH p IN builder.properties %]
+    [% p.key %]: [% p.value %]
+    [% END %]
+    java-opts:
+    [% FOREACH option IN builder.java_options %]
+    - "[% option %]"
+    [% END %]
+    ant-name: [% builder.ant_name %]
+[% END %]
+
+[% BLOCK copy_artifact_builder %]
+    - copyartifact:
+  project: [% builder.project %]
+  filter: [% builder.filter %]
+  target: [% builder.target %]
+    which-build: [% builder.build %]
+    build-number: [% builder.build_number %]
+  optional: [% builder.optional %]
+  flatten: [% builder.flatten %]
+    parameter-filters: [% builder.parameter_filters %]
+[% END %]
+
+[% BLOCK inject_builder %]
+    - inject:
+    properties-file: [% builder.properties_file %]
+    properties-content: [% builder.properties_content %]
+[% END %]
+
+[% BLOCK shell_builder %]
+    - shell: [% builder.cmd %]
+[% END %]
+
+[% BLOCK trigger_builds_builder %]
+    - trigger-builds:
+    - project: [% builder.project %]
+    predefined-parameters: [% builder.predefined_parameters %]
+  block: [% builder.block %]
+    current-parameters: [% builder.current_parameters %]
+    svn-revision: [% builder.svn_revision %]
+[% END %]
+
+[% BLOCK multijob_builder %]
+    - multijob:
+  name: [% builder.name %]
+  condition: [% builder.condition %]
+  projects:
+    [% FOREACH project IN builder.projects %]
+    - name: [% project.name %]
+    current-parameters: [% project.current_parameter %]
+    node-label-name: [% project.node_label_name %]
+    node-label: [% project.node_label %]
+    git-revision: [% project.git_revision %]
+    property-file: [% project.property_file %]
+    predefined-parameters: [% project.predefined_parameters %]
+    [% END %]
+[% END %]
+
+
+[% BLOCK conditional_builder %]
+    - conditional-step:
+    condition-kind: [% builder.condition_kind %]
+    condition-worst: [% builder.condition_worst %]
+    condition-best: [% builder.condition_best %]
+  steps:
+    [% FOREACH step IN builder.steps %]
+    - [% step.key %]: [% step.value %]
+    [% END %]
+[% END %]
+
+[% BLOCK parameters %]
+
+[% END %]
+
+[% BLOCK bool_parameter %]
+    - bool:
+  name: [% parameter.name %[
+             default: [% parameter.default %]
+             description: [% parameter.description %]
+[% END %]
+
+[% BLOCK selection_parameter %]
+    - bool:
+  name: [% parameter.name %[
+             choices:
+               [% FOREACH choice IN choices %]
+               - [% choice %]
+               [% END %]
+             description: [% parameter.description %]
+[% END %]
+
+[% BLOCK string_parameter %]
+    - string:
+  name: [% parameter.name %[
+             default: [% parameter.default %]
+             description: [% parameter.description %]
+[% END %]
+
+[% BLOCK text_parameter %]
+    - string:
+  name: [% parameter.name %[
+             default: [% parameter.default %]
+             description: [% parameter.description %]
+[% END %]
+
+
+[% BLOCK svn_parameter %]
+    svn-tags:
+  name: BRANCH_NAME
+  default: release
+  description: A parameter named BRANCH_NAME default is release
+  url: http://svn.example.com/repo
+  filter: [A-za-z0-9]*
+[% END %]
+
+[% BLOCK github_property %]
+    - github:
+  url: [% property.url %]
+[% END %]
+
+[% BLOCK promoted_build %]
+    - promoted-build:
+  names:
+    [% FOREACH name IN  property.names %]
+    - "[% name %]"
+    [% END %]
+[% END %]
+
+[% BLOCK archive_publisher%]
+    - archive:
+  artifacts: [% publisher.artifacts %]
+  excludes: [% publisher.excludes %]
+    latest-only: [% publisher.lastest_only %]
+  allow_empty: [% publisher.allow_empty %]
+[% END %]
+
+[% BLOCK artifact_deployer_publishers%]
+    - artifact-deployer:
+  entries:
+    [% FOREACH entry IN entries %]
+    - files: [% entry.files %]
+  basedir: [% entry.basedir %]
+  excludes: [% entry.excludes %]
+  remote: [% entry.remote %]
+  flatten: [% entry.flatten %]
+    delete-remote: [% entry.delete_remote %]
+    delete-remote-artifacts: [% entry.delete_remote_artifacts %]
+    fail-no-files: [% entry.fail_no_files %]
+    groovy-script: [% entry.groovy_script %]
+    [% END %]
+[% END %]
